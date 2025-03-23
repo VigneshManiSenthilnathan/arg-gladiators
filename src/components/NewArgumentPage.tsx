@@ -13,7 +13,7 @@ export function NewArgumentPage({ onNavigate }: NewArgumentPageProps, _context: 
         {
           type: 'string',
           name: 'title',
-          label: "Argument Title",
+          label: "Argument Title ",
           required: true,
         },
         {
@@ -43,11 +43,14 @@ export function NewArgumentPage({ onNavigate }: NewArgumentPageProps, _context: 
   );
 
   return (
-    <vstack height="100%" alignment="center middle" gap="medium">
-      <text size="large" weight="bold">Create New Argument</text>
-      <spacer size="medium" />
-      <button onPress={() => _context.ui.showForm(form)}>Create Argument</button>
-      <button onPress={() => onNavigate('welcome')}>Back</button>
-    </vstack>
+    <zstack width="100%" height="100%" alignment="center middle">
+      <image url="background1.jpg" imageHeight="256px" imageWidth="256px" width="100%" height="100%" />
+      <vstack height="100%" alignment="center middle" gap="medium">
+        <text size="large" weight="bold" color='black'>Create New Argument</text>
+        <spacer size="medium" />
+        <button onPress={() => _context.ui.showForm(form)}>Create Argument</button>
+        <button onPress={() => onNavigate('welcome')}>Back</button>
+      </vstack>
+    </zstack>
   );
 }

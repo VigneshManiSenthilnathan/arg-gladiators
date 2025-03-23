@@ -45,6 +45,7 @@ export const PlayerHome = ({ onNavigate }: PlayerHomeProps, _context: Context): 
       if (!player_curr) {
         await _context.redis.hSet(`battle:${battleId}:player`, {
           joinedAt: new Date().toISOString(),
+          lastPage: 'player-home',
           side: '',
           hero: '',
           weapon: '',
@@ -85,35 +86,31 @@ export const PlayerHome = ({ onNavigate }: PlayerHomeProps, _context: Context): 
   };
   
   return (
-    <vstack height="100%" padding="medium" gap="large" alignment="center middle">
-      <spacer size="large" />
-      
-      <text size="xxlarge" weight="bold">Argument Battle</text>
-      <text size="large">Join the epic debate!</text>
-      
-      <spacer size="large" />
-      
-      {/* <image
-        url="https://placeholder.com/battle-logo.png"
-        imageWidth="200px"
-        imageHeight="200px"
-        resizeMode="fit"
-      /> */}
-      
-      <spacer size="large" />
-      
-      <button
-        onPress={handleJoin}
-        disabled={joining}
-        size="large"
-        appearance="primary"
-      >
-        {joining ? "JOINING..." : "JOIN"}
-      </button>
-      
-      <spacer size="medium" />
-      
-      <text size="small">By joining, you'll be able to pick a side and enter the battle!</text>
-    </vstack>
+    <zstack width="100%" height="100%" alignment="center middle">
+      <image url="background1.jpg" imageHeight="256px" imageWidth="256px" width="100%" height="100%" />
+      <vstack height="100%" padding="medium" gap="large" alignment="center middle">
+        
+        {/* // Consider changing to the arg istself */}
+        <text size="xxlarge" weight="bold" color='black'>Argument Gladiators</text>
+        <text size="large" color='black'>Join the epic debate!</text>
+    
+        {/* <image
+          url="logo.png"
+          imageWidth="100px"
+          imageHeight="100px"
+          resizeMode="fit"
+        /> */}
+        
+        <button
+          onPress={handleJoin}
+          disabled={joining}
+          size="large"
+        >
+          {joining ? "JOINING..." : "JOIN"}
+        </button>
+        
+        <text size="small" color='black'>By joining, you'll be able to pick a side and enter the battle!</text>
+      </vstack>
+    </zstack>
   );
 }
