@@ -7,16 +7,21 @@ export interface Hero {
 
 export const HEROES: Hero[] = [
   {
-    id: 'hero1',
+    id: 'knight',
     name: 'King\'s Knight',
     sprite: 'knight/knight_plain.gif',
     description: 'A brave fighter'
   },
   {
-    id: 'hero2',
+    id: 'mage',
     name: 'Royal Mage',
     sprite: 'mage/mage_plain.gif',
     description: 'A powerful spellcaster'
+  },
+  {
+    id: 'barbarian',
+    name: 'Barbarian King',
+    sprite: 'barbarian/barbarian_plain.gif',
+    description: 'Leader of the rebellion'
   }
-  // Add more heroes
 ];

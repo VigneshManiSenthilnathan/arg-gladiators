@@ -1,38 +1,70 @@
 import type { Context } from '@devvit/public-api';
 import { usePagination } from '@devvit/kit';
-import { Devvit, useState } from '@devvit/public-api';
-import { WEAPONS } from '../data/weapons';
+import { Devvit, useState, useAsync } from '@devvit/public-api';
+
+import { WEAPONS_KNIGHT } from '../data/weapons/knight';
+import { WEAPONS_MAGE } from '../data/weapons/mage';
+import { WEAPONS_BARBARIAN } from '../data/weapons/barbarian';
 // import { savePlayerProfile, getPlayerProfile } from '../utils/storage';
 
 interface PickWeaponPageProps {
     onNavigate: (page: string) => void;
 }
-  
+
+interface Weapon extends Record<string, string> {
+    id: string;
+    name: string;
+    sprite: string;
+    description: string;
+}
 
 export const PickWeaponPage = ({ onNavigate }: PickWeaponPageProps, _context: Context): JSX.Element => {
     const [selectedWeapon, setSelectedWeapon] = useState<string | null>(null);
+    const [weaponsList, setWeaponsList] = useState<Weapon[]>(async () => {
+        const username = await _context.reddit.getCurrentUsername();
+        const heroClassRedis = await _context.redis.hGet(`battle:${_context.postId}:${username}`, 'hero');
+        
+        if (heroClassRedis === 'knight') {
+            return WEAPONS_KNIGHT;
+        } else if (heroClassRedis === 'mage') {
+            return WEAPONS_MAGE;
+        } else if (heroClassRedis === 'barbarian') {
+            return WEAPONS_BARBARIAN;
+        }
+        else{
+            throw new Error('Failed to retrieve hero class');
+        }
+        
+        return [];
+    });
 
-      // Use pagination with 1 item per page
-      const { 
-        currentItems, 
-        currentPage, 
-        pagesCount, 
-        toNextPage, 
-        toPrevPage, 
-        isFirstPage, 
-        isLastPage 
-      } = usePagination(_context, WEAPONS, 1);
+    // Use pagination with 1 item per page
+    if (!weaponsList){
+        throw new Error('Failed to retrieve weapons list');
+    }
+
+    const { 
+    currentItems, 
+    currentPage, 
+    pagesCount, 
+    toNextPage, 
+    toPrevPage, 
+    isFirstPage, 
+    isLastPage 
+    } = usePagination(_context, weaponsList, 1);
 
     const handleWeaponSelect = async (weaponName: string) => {
         setSelectedWeapon(weaponName);
 
         // Get existing profile and update with hero
-        const currentUser = await _context.reddit.getCurrentUser(); // Vulnerability: requires user to be logged in
-        const battleId = await _context.redis.get('battleId');
-        if (!currentUser) {
+        const [currentUsername, postId] = await Promise.all([
+            await _context.reddit.getCurrentUsername(), // Vulnerability: requires user to be logged in
+            _context.postId
+        ]);
+        if (!currentUsername) {
             throw new Error('Failed to retrieve current user information');
         }
-        const existingProfile = await _context.redis.hGetAll(`battle:${battleId}:${currentUser.username}`);
+        const existingProfile = await _context.redis.hGetAll(`battle:${postId}:${currentUsername}`);
         const updatedProfile = {
             joinedAt: existingProfile.joinedAt,
             lastPage: 'pick-weapon',
@@ -43,7 +75,7 @@ export const PickWeaponPage = ({ onNavigate }: PickWeaponPageProps, _context: Co
         };
 
         // Save updated profile
-        await _context.redis.hSet(`battle:${battleId}:${currentUser.username}`, updatedProfile);
+        await _context.redis.hSet(`battle:${postId}:${currentUsername}`, updatedProfile);
     };
 
     const handleContinue = () => {
@@ -58,55 +90,61 @@ export const PickWeaponPage = ({ onNavigate }: PickWeaponPageProps, _context: Co
     return (
         <zstack width="100%" height="100%" alignment="center middle">
             <image url="background1.jpg" imageHeight="256px" imageWidth="256px" width="100%" height="100%" />
-            <vstack padding='medium' alignment='center'>
-                <text size="large" weight="bold">
+            <vstack padding='medium' alignment='center' gap='small'>
+                <text size="large" weight="bold" color='black'>
                     Choose Your Weapon
                 </text>
                 
-                <vstack>
-                    {currentItems.map((weapon) => (
-                    <hstack 
-                        key={weapon.id}
-                        onPress={() => handleWeaponSelect(weapon.id)}
-                        borderColor={selectedWeapon === weapon.name ? 'white' : 'black'}
-                        padding='small'
-                        gap='small'
-                        cornerRadius='medium'
-                    >
-                        <image 
-                            url='logo.png'
-                            imageWidth="100px"
-                            imageHeight="100px"
+                {weaponsList?.length === 0 &&
+                    <text>Loading weapons...</text>
+                }   
+                {weaponsList?.length !== 0 &&
+                    <hstack alignment="middle center" gap="small" padding="small">
+                        <button 
+                            onPress={toPrevPage} 
+                            disabled={isFirstPage}
+                            icon="left"
                         />
-                        <vstack>
-                            <text weight='bold'>{weapon.name}</text>
-                            <text>{weapon.id}</text>
-                        </vstack>
+                        <text color='black'>Page {currentPage + 1} of {pagesCount}</text>
+                        <button 
+                            onPress={toNextPage} 
+                            disabled={isLastPage}
+                            icon="right"
+                        />
                     </hstack>
-                    ))}
-                </vstack>
+                }
+                {weaponsList?.length !== 0 && 
+                    <vstack>
+                        {currentItems.map((weapon) => (
+                        <hstack 
+                            key={weapon.id}
+                            onPress={() => handleWeaponSelect(weapon.id)}
+                            borderColor={selectedWeapon === weapon.id ? 'white' : undefined}
+                            padding='small'
+                            gap='small'
+                            cornerRadius='medium'
+                        >
+                            <image 
+                                url={'weapons/'+weapon.sprite}
+                                imageWidth="100px"
+                                imageHeight="100px"
+                            />
+                            <vstack gap='small' padding='small' cornerRadius='small' 
+                                backgroundColor={selectedWeapon === weapon.id ? 'rgba(20,28,36,0.2)' : undefined}>
+                                <text weight='bold' color='black'>{weapon.name}</text>
+                                <text color='black'>{weapon.id}</text>
+                            </vstack>
+                        </hstack>
+                        ))}
+                    </vstack>
+                }
 
-                {/* Pagination Controls */}
-                <hstack alignment="middle center" gap="small" padding="small">
-                <button 
-                    onPress={toPrevPage} 
-                    disabled={isFirstPage}
-                    icon="left"
-                />
-                <text>Page {currentPage + 1} of {pagesCount}</text>
-                <button 
-                    onPress={toNextPage} 
-                    disabled={isLastPage}
-                    icon="right"
-                />
-                </hstack>
 
                 <button 
                     onPress={handleContinue}
                     disabled={!selectedWeapon}
-                    width={'50%'}
                 >
-                    Continue
+                    Continue to Arena
                 </button>
             </vstack>
         </zstack>

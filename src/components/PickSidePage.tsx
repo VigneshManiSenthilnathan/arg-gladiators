@@ -4,34 +4,31 @@ import { Devvit, useState, useAsync } from '@devvit/public-api';
 
 interface PickSidePageProps {
   onNavigate: (page: string) => void;
-  options: { leftSide: string; rightSide: string } | null;
 }
 
-export const PickSidePage = ({ onNavigate, options }: PickSidePageProps, _context: Context): JSX.Element => {
+export const PickSidePage = ({ onNavigate }: PickSidePageProps, _context: Context): JSX.Element => {
     // console.log('reached PickSidePage.tsx');
     const [selectedSide, setSelectedSide] = useState<string | null>(null);
     // const [argument, setArgument] = useState<{ leftSide: string, rightSide: string } | null>(null);
 
     async function getArgumentSides() {
         try {
-            const battleId = await _context.redis.get('battleId');
-            const argVals = await _context.redis.hGetAll(`battle:${battleId}`);
+            const postId = _context.postId;
+            const postInfo = await _context.redis.hGetAll(`battle:${postId}:info`);
             // console.log('Argument values:', argVals);
 
-            if (!argVals) return null;
+            if (!postInfo) return null;
 
-            const argValsParsed = JSON.parse(argVals.values);
+            // const argValsParsed = JSON.parse(postInfo.values);
             // console.log('Parsed argument values:', argValsParsed);
             const argSides = {
-                leftSide: argValsParsed.sideA,
-                rightSide: argValsParsed.sideB
+                leftSide: postInfo.sideA,
+                rightSide: postInfo.sideB
             }
-
-            options = argSides;
             // console.log('Argument sides:', argSides);
             return {
-                leftSide: argValsParsed.sideA,
-                rightSide: argValsParsed.sideB
+                leftSide: postInfo.sideA,
+                rightSide: postInfo.sideB
             };
         }
         catch (error) {
@@ -50,10 +47,6 @@ export const PickSidePage = ({ onNavigate, options }: PickSidePageProps, _contex
         }
     }, {}); // Empty options object ensures it runs only once
 
-    // console.log('Async results:', argumentSides);
-    // console.log('ArgLeft:', argLeft);
-    // console.log('ArgRight:', argRight);
-
 
   // Handle side selection
   const handleSideSelect = (side: string) => {
@@ -71,15 +64,15 @@ export const PickSidePage = ({ onNavigate, options }: PickSidePageProps, _contex
     if (selectedSide !== null) {
       choice = selectedSide;
     }
-    const [username, battleId] = await Promise.all([
+    const [username, postId] = await Promise.all([
       _context.reddit.getCurrentUsername(), // Vulnerability: requires user to be logged in
-      _context.redis.get('battleId')
+      _context.postId
     ]);
     if (!username) {
         throw new Error('Failed to retrieve current user information');
     }
     // console.log('Selected side:', choice);
-    const existingProfile = await _context.redis.hGetAll(`battle:${battleId}:${username}`);
+    const existingProfile = await _context.redis.hGetAll(`battle:${postId}:${username}`);
     const updatedProfile = {
         joinedAt: existingProfile.joinedAt,
         lastPage: 'pick-side',
@@ -91,7 +84,7 @@ export const PickSidePage = ({ onNavigate, options }: PickSidePageProps, _contex
     console.log('Updated profile:', updatedProfile);
 
     // Save updated profile
-    await _context.redis.hSet(`battle:${battleId}:${username}`, updatedProfile);
+    await _context.redis.hSet(`battle:${postId}:${username}`, updatedProfile);
   }
 
   // Continue to next page

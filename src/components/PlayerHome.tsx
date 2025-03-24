@@ -17,33 +17,23 @@ export const PlayerHome = ({ onNavigate }: PlayerHomeProps, _context: Context): 
     
     try {
       // Get current user information
-      const currentUser = await _context.reddit.getCurrentUser();
-      const battleId = await _context.redis.get('battleId');
+      const currentUsername = await _context.reddit.getCurrentUsername();
+      const postId = _context.postId;
       
-      if (!currentUser) {
+      if (!currentUsername) {
         throw new Error('Failed to retrieve current user information');
       }
 
-      // Create player profile
-      const playerProfile = {
-        username: currentUser.username,
-        joinedAt: new Date().toISOString(),
-        battleId: battleId,
-        side: null,
-        hero: null,
-        weapon: null,
-        warCry: null
-      };
       
       // Store in running memory
       //setPlayerData(playerProfile);
       
       // TODO: Store in Redis for persistence
-      const players = await _context.redis.hGet(`battle:${battleId}:player`, 'players');
-      const player_curr = await _context.redis.hKeys(`battle:${battleId}:${currentUser.username}`);
+      const players = await _context.redis.hGet(`battle:${postId}:player`, 'players');
+      const player_curr = await _context.redis.hKeys(`battle:${postId}:${currentUsername}`);
 
       if (!player_curr) {
-        await _context.redis.hSet(`battle:${battleId}:player`, {
+        await _context.redis.hSet(`battle:${postId}:${currentUsername}`, {
           joinedAt: new Date().toISOString(),
           lastPage: 'player-home',
           side: '',
@@ -54,13 +44,13 @@ export const PlayerHome = ({ onNavigate }: PlayerHomeProps, _context: Context): 
       }
 
       const playersArray = players ? JSON.parse(players) : [];
-      if (playersArray.includes(currentUser.username)) {
+      if (playersArray.includes(currentUsername)) {
         _context.ui.showToast('You have already joined this battle');
       } else {
-        playersArray.push(currentUser.username);
+        playersArray.push(currentUsername);
         const newPlayers = JSON.stringify(playersArray);
-        await _context.redis.hSet(`battle:${battleId}:player`, { players: newPlayers });
-        await _context.redis.hSet(`battle:${battleId}:${currentUser.username}`, {
+        await _context.redis.hSet(`battle:${postId}:players`, { players: newPlayers });
+        await _context.redis.hSet(`battle:${postId}:${currentUsername}`, {
           joinedAt: new Date().toISOString(),
           side: '',
           hero: '',
@@ -88,10 +78,10 @@ export const PlayerHome = ({ onNavigate }: PlayerHomeProps, _context: Context): 
   return (
     <zstack width="100%" height="100%" alignment="center middle">
       <image url="background1.jpg" imageHeight="256px" imageWidth="256px" width="100%" height="100%" />
-      <vstack height="100%" padding="medium" gap="large" alignment="center middle">
+      <vstack height="100%" padding="medium" gap="medium" alignment="center middle">
         
         {/* // Consider changing to the arg istself */}
-        <text size="xxlarge" weight="bold" color='black'>Argument Gladiators</text>
+        <image url="logo.png" imageHeight="256px" imageWidth="256px" width="40%" height="40%" />
         <text size="large" color='black'>Join the epic debate!</text>
     
         {/* <image

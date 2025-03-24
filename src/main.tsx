@@ -1,8 +1,6 @@
-import { Devvit, useState } from '@devvit/public-api';
-import { WelcomePage } from './components/WelcomePage';
-import { NewArgumentPage } from './components/NewArgumentPage';
-import { MyArgumentsPage } from './components/MyArgumentsPage';
-import { HowToUsePage } from './components/HowToUsePage';
+import type { Context, Post } from '@devvit/public-api';
+import { Devvit, useState, useForm } from '@devvit/public-api';
+
 import { PlayerHome } from './components/PlayerHome';
 import { PickSidePage } from './components/PickSidePage';
 import { PickHeroPage } from './components/PickHeroPage';
@@ -18,89 +16,108 @@ Devvit.configure({
 Devvit.addCustomPostType({
   name: 'Argument Battle Creator',
   render: (context) =>{
+    // // Implement navigation between pages
+    // const [defaultPage, setDefaultPage] = useState('welcome');
+
     // Implement navigation between pages
     const [defaultPage, setDefaultPage] = useState(async () => {
       try {
-        const [username, battleId] = await Promise.all([
+        const [username, postId] = await Promise.all([
           context.reddit.getCurrentUsername(), // Vulnerability: requires user to be logged in
-          context.redis.get('battleId')
+          context.postId
         ]);
         
-        if (username && battleId) {
+        if (username && postId) {
           // Check if the user has data in Redis
-          const exists = await context.redis.exists(`battle:${battleId}:${username}`);
+          const exists = await context.redis.exists(`battle:${postId}:${username}`);
           
           if (exists) {
             // Get the user's data from Redis
-            const userData = await context.redis.hGetAll(`battle:${battleId}:${username}`);
+            const userData = await context.redis.hGetAll(`battle:${postId}:${username}`);
             
             // If lastPage exists, return it, otherwise return 'welcome'
-            return userData.lastPage || 'welcome';
+            return userData.lastPage || 'player-home';
           }
         }
         
         // Default to 'welcome' if no data is found
-        return 'welcome';
+        return 'player-home';
       } catch (error) {
         console.error('Error retrieving page from Redis:', error);
-        return 'welcome';
+        return 'player-home';
       }
     });
-    
-
+        
+  
     switch(defaultPage) {
-      case 'welcome':
-        return <WelcomePage onNavigate={setDefaultPage} />;
-      case 'new-argument':
-        return <NewArgumentPage onNavigate={setDefaultPage} />;
-      case 'my-arguments':
-        return <MyArgumentsPage onNavigate={setDefaultPage} />;
-      case 'how-to-use':
-        return <HowToUsePage onNavigate={setDefaultPage} />;
       case 'player-home':
         return <PlayerHome onNavigate={setDefaultPage} />;
       case 'pick-side':
-        return <PickSidePage onNavigate={setDefaultPage} options={null}/>;
+        return <PickSidePage onNavigate={setDefaultPage}/>;
       case 'pick-hero':
         return <PickHeroPage onNavigate={setDefaultPage} />;
       case 'pick-weapon':
         return <PickWeaponPage onNavigate={setDefaultPage} />;
       default:
-        return <WelcomePage onNavigate={setDefaultPage} />;
+        return <PlayerHome onNavigate={setDefaultPage} />;
     }
   }
 });
 
-async function getUserInformation(context: Devvit.Context) {
-  // Set a key
-  const username = await context.reddit.getCurrentUsername();
-  console.log('User Name:', username);
-  if (username) {
-    await context.redis.set('createdBy', username);
-    await context.redis.set('createdAt', new Date().toISOString());
-    await context.redis.set('battleId', `${username}_${new Date().toISOString()}`);
-    await context.redis.hSet(`battle:${username}_${new Date().toISOString()}:players`, { players : JSON.stringify([]) });
-    await context.redis.hSet(`battle:${username}_${new Date().toISOString()}:${username}`, {
-      joinedAt: '',
-      side: '',
-      hero: '',
-      weapon: '',
-      warCry: '',
-    });
-  } else {
-    console.error('Failed to get current user');
-  }
-}
 
-// Add menu action to create a new argument battle post
-Devvit.addMenuItem({
-  location: 'subreddit',
-  label: 'Create Argument Battle Creator',
-  onPress: async (event, context) => {
-    const currentSubredditName = await context.reddit.getCurrentSubredditName();
-    await getUserInformation(context);
-    await context.reddit.submitPost({
-      title: 'Argument Battle Creator',
+// let values: ({ title: string; } & { sideA: string; } & { sideB: string; } & { [key: string]: any; }) | null = null;
+const argumentForm = Devvit.createForm(
+  {
+    fields: [
+      {
+        name: 'title',
+        label: 'Argument Title',
+        type: 'string',
+        required: true,
+        helpText: 'Enter a title for your argument battle'
+      },
+      {
+        name: 'sideA',
+        label: 'Side A Name',
+        type: 'string',
+        required: true,
+        helpText: 'Description for the first side of the argument'
+      },
+      {
+        name: 'sideB',
+        label: 'Side B Name',
+        type: 'string',
+        required: true,
+        helpText: 'Description for the second side of the argument'
+      },
+      {
+        name: 'duel',
+        label: 'Enable Duel Mode',
+        type: 'boolean',
+        defaultValue: false,
+        helpText: 'Enable duel mode for this argument battle'
+      },
+      {
+        name: 'bots',
+        label: 'Bots',
+        type: 'boolean',
+        defaultValue: false,
+        helpText: 'Allow bots to participate in this argument battle',
+      }
+    ],
+    title: 'Create Argument Battle',
+    acceptLabel: 'Create Battle',
+  },
+
+  async (event, context) => {
+
+    const [ currentSubredditName, username ] = await Promise.all([
+      context.reddit.getCurrentSubredditName(),
+      context.reddit.getCurrentUsername() // Vulnerability: requires user to be logged in
+    ]);
+
+    const post = await context.reddit.submitPost({
+      title: (event.values.title ? event.values.title : 'New Argument Battle'),
       subredditName: currentSubredditName,
       preview: (
         <vstack width="100%" height="100%" alignment="middle center">
@@ -108,6 +125,62 @@ Devvit.addMenuItem({
         </vstack>
       ),
     });
+
+    if (event) {
+      if (username) {
+        await context.redis.hSet(`battle:${post.id}:metadata`, {
+          creator: username,
+          createdAt: Date.now().toString(),
+          title: event.values.title,
+        });
+        await context.redis.hSet(`battle:${post.id}:players`, { 
+          players : JSON.stringify([]) 
+        });
+        await context.redis.hSet(`battle:${post.id}:${username}`, {
+          joinedAt: '',
+          lastPage: 'player-home',
+          side: '',
+          hero: '',
+          weapon: '',
+          warCry: '',
+        });
+
+      }
+      if (post) {
+        await context.redis.hSet(`battle:${post.id}:info`, {
+          title: event.values.title,
+          sideA: event.values.sideA,
+          sideB: event.values.sideB,
+          duel: event.values.duel? 'enabled' : 'disabled',
+          bots: event.values.bots? 'enabled' : 'disabled',
+        });
+      } else {
+        console.error('No post info found in Redis');
+      }
+    }
+  }
+);
+
+async function getArgumentInformation(context: Devvit.Context) {
+  // Show the form to the user and get the result
+  context.ui.showForm(argumentForm);
+}
+
+// Add menu action to create a new argument battle post
+Devvit.addMenuItem({
+  location: 'subreddit',
+  label: 'Create Argument Battle Creator',
+  onPress: async (event, context) => {
+
+    const [username] = await Promise.all([
+      context.reddit.getCurrentUsername(), // Vulnerability: requires user to be logged in
+    ]);
+    if (!username) {
+      throw new Error('Please log in to create a battle');
+    }
+
+    // await getUserInformation(context, username);
+    await getArgumentInformation(context);
     context.ui.showToast('Created Argument Battle Creator post!');
   },
 });

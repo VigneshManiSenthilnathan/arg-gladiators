@@ -36,14 +36,14 @@ export const PickHeroPage = ({ onNavigate }: PickHeroPageProps, _context: Contex
       choice = selectedHero;
     }
 
-    const [username, battleId] = await Promise.all([
+    const [username, postId] = await Promise.all([
       _context.reddit.getCurrentUsername(), // Vulnerability: requires user to be logged in
-      _context.redis.get('battleId')
+      _context.postId
     ]);
     if (!username) {
         throw new Error('Failed to retrieve current user information');
     }
-    const existingProfile = await _context.redis.hGetAll(`battle:${battleId}:${username}`);
+    const existingProfile = await _context.redis.hGetAll(`battle:${postId}:${username}`);
     const updatedProfile = {
         joinedAt: existingProfile.joinedAt,
         lastPage: 'pick-hero',
@@ -55,17 +55,22 @@ export const PickHeroPage = ({ onNavigate }: PickHeroPageProps, _context: Contex
     console.log('Updated profile:', updatedProfile);
 
     // Save updated profile
-    await _context.redis.hSet(`battle:${battleId}:${username}`, updatedProfile);
+    await _context.redis.hSet(`battle:${postId}:${username}`, updatedProfile);
   };
-
 
   const handleHeroSelect = async (heroName: string) => {
     handleHeroSelectUI(heroName);
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (selectedHero) {
         saveHeroSelection();
+        const username = await _context.reddit.getCurrentUsername();
+        let heroRedis = await _context.redis.hGet(`battle:${_context.postId}:${username}`, 'hero');
+        while (heroRedis !== selectedHero) {
+          heroRedis = await _context.redis.hGet(`battle:${_context.postId}:${username}`, 'hero');
+        }
+        console.log('Redis hero:', heroRedis); 
         onNavigate('pick-weapon');
     } else {
         // Show error or prevent navigation
@@ -77,33 +82,10 @@ export const PickHeroPage = ({ onNavigate }: PickHeroPageProps, _context: Contex
     <zstack width="100%" height="100%" alignment="center middle">
       <image url="background1.jpg" imageHeight="256px" imageWidth="256px" width="100%" height="100%" />
       <vstack padding='medium' alignment='center' gap='small'>
-        <text size="large" weight="bold" color='black'>
+        <text size="xlarge" weight="bold" color='black'>
           Choose Your Hero
         </text>
-        
-        <vstack>
-          {currentItems.map((hero) => (
-            <hstack 
-              key={hero.id}
-              onPress={() => handleHeroSelect(hero.name)}
-              borderColor={selectedHero === hero.name ? 'white' : undefined}
-              padding='small'
-              gap='small'
-              cornerRadius='medium'
-            >
-              <image 
-                url={'heroes/' + hero.sprite}
-                imageWidth="100px"
-                imageHeight="100px"
-              />
-              <vstack>
-                <text weight='bold' color='black'>{hero.name}</text>
-                <text color='black'>{hero.description}</text>
-              </vstack>
-            </hstack>
-          ))}
-        </vstack>
-        
+
         {/* Pagination Controls */}
         <hstack alignment="middle center" gap="small" padding="small">
           <button 
@@ -118,6 +100,31 @@ export const PickHeroPage = ({ onNavigate }: PickHeroPageProps, _context: Contex
             icon="right"
           />
         </hstack>
+        
+        <vstack>
+          {currentItems.map((hero) => (
+            <hstack 
+              key={hero.id}
+              onPress={() => handleHeroSelect(hero.id)}
+              // borderColor={selectedHero === hero.id ? 'white' : undefined}
+              padding='small'
+              gap='small'
+              cornerRadius='medium'
+            >
+              <image 
+                url={'heroes/' + hero.sprite}
+                imageWidth="100px"
+                imageHeight="100px"
+              />
+          
+              <vstack gap='small' padding='small' cornerRadius='small' 
+                backgroundColor={selectedHero === hero.id ? 'rgba(20,28,36,0.2)' : undefined}>
+                <text weight='bold' color='black'>{hero.name}</text>
+                <text color='black'>{hero.description}</text>
+              </vstack>
+            </hstack>
+          ))}
+        </vstack>
 
         <button 
           onPress={handleContinue}
